@@ -6,8 +6,9 @@
 
 #define WHITE 0xFFFFFFu
 #define BLACK 0x000000u
+#define RED 0xFF0000u
 
-#define PADEL_SPEED 4
+#define PADEL_SPEED 6
 #define BALL_SPEED 3
 
 static int global_running;
@@ -16,6 +17,7 @@ typedef struct
 {
     SDL_Rect rect;
     int vely;
+    int points;
 }Padel;
 
 typedef struct
@@ -26,6 +28,7 @@ typedef struct
     int velx;
     int vely;
     uint32_t color;
+    int start_movement;
 
 }Ball;
 
@@ -110,19 +113,45 @@ void clear_window_surface(SDL_Surface *Surface)
 
 void move_padel(Padel *padel)
 {
-    padel->rect.y += padel->vely;
-    padel->vely = 0;
+    if ((padel->vely > 0) && (padel->rect.y + padel->rect.h < SCREEN_HEIGHT - 10))
+    {
+        padel->rect.y += padel->vely;
+        padel->vely = 0;
+    }
+    if ((padel->vely < 0) && (padel->rect.y > 10))
+    {
+        padel->rect.y += padel->vely;
+        padel->vely = 0;
+    }
 }
 
-void ball_window_colision(Ball *ball)
+void move_ball(Ball *ball)
+{
+    if (ball->start_movement)
+    {
+        ball->x += ball->velx;
+        ball->y += ball->vely;
+    }
+
+}
+
+void ball_window_colision(Ball *ball, Padel *padel1, Padel *padel2)
 {
     if (ball->x + ball->radius >= SCREEN_WIDTH)
     {
+        ball->x = SCREEN_WIDTH / 2;
+        ball->y = SCREEN_HEIGHT / 2;
+        ball->start_movement = 0;
         ball->velx = -BALL_SPEED;
+        padel1->points++;
     }
     if (ball->x - ball->radius <= 0)
     {
+        ball->x = SCREEN_WIDTH / 2;
+        ball->y = SCREEN_HEIGHT / 2;
+        ball->start_movement = 0;
         ball->velx = BALL_SPEED;
+        padel2->points++;
     }
     if (ball->y + ball->radius >= SCREEN_HEIGHT)
     {
@@ -134,30 +163,27 @@ void ball_window_colision(Ball *ball)
     }
 }
 
+// void display_score(SDL_Surface *Surface, )
+
 void ball_padel_colision(Ball *ball, Padel *padel1, Padel *padel2)
 {
+
     if (ball->velx > 0 && ((ball->y + ball->radius > padel2->rect.y) && 
        (ball->y - ball->radius < padel2->rect.y + padel2->rect.h)))
     {
-        if (ball->x + ball->radius >= padel2->rect.x)
+        if (ball->x + ball->radius + 1 >= padel2->rect.x)
         {
             ball->velx = -BALL_SPEED;
         }
     }
     if (ball->velx < 0 && ((ball->y + ball->radius > padel1->rect.y) && 
-       (ball->y - ball->radius < padel1->rect.y + padel1->rect.h)))
+       (ball->y - ball->radius - 1 <= padel1->rect.y + padel1->rect.h)))
     {
         if (ball->x - ball->radius <= padel1->rect.x + padel1->rect.w)
         {
             ball->velx = BALL_SPEED;
         }
     }
-}
-
-void move_ball(Ball *ball)
-{
-    ball->x += ball->velx;
-    ball->y += ball->vely;
 }
 
 int main(int argc, char *argv[])
@@ -173,7 +199,7 @@ int main(int argc, char *argv[])
     
     Window = SDL_CreateWindow("Pong", 
                 SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 
-                SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN|SDL_WINDOW_BORDERLESS);
+                SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
 
     if (Window == NULL)
     {
@@ -186,16 +212,15 @@ int main(int argc, char *argv[])
     SDL_FillRect(WindowSurface, NULL, BLACK);
 
     //Creating padels
-    Padel padel1 = {{30, 30, 20, 100}, 0};
-    Padel padel2 = {{590, 350, 20, 100}, 0};
+    Padel padel1 = {{30, 30, 15, 75}, 0};
+    Padel padel2 = {{(SCREEN_WIDTH - 45), 350, 15, 75}, 0};
 
     //Create ball
-    Ball ball = {300, 200, 8, BALL_SPEED, BALL_SPEED, WHITE};
+    Ball ball = {(SCREEN_WIDTH/2), (SCREEN_HEIGHT/2), 6, BALL_SPEED, BALL_SPEED, WHITE};
+    ball.start_movement = 0;
 
     global_running = 1;
     SDL_Event event;
-    SDL_KeyCode keycode;
-    int keydown;
 
     while(global_running)
     {
@@ -228,6 +253,10 @@ int main(int argc, char *argv[])
         {
             padel2.vely = PADEL_SPEED;
         }        
+        if (keystates[SDL_SCANCODE_RETURN])
+        {
+            ball.start_movement = 1;
+        }
 
         clear_window_surface(WindowSurface);
 
@@ -237,17 +266,19 @@ int main(int argc, char *argv[])
 
         //Ball movement
         ball_padel_colision(&ball, &padel1, &padel2);
-        ball_window_colision(&ball);
+        ball_window_colision(&ball, &padel1, &padel2);
         move_ball(&ball);
 
+        //TODO: Improve ball colision
+        //TODO: Display player points
+        //TODO: Dynamic gameplay with changing dificulty
+
         //Draw Padels
-        SDL_FillRect(WindowSurface, &(padel1.rect), WHITE);
+        SDL_FillRect(WindowSurface, &(padel1.rect), RED);
         SDL_FillRect(WindowSurface, &(padel2.rect), WHITE);
 
         //Draw ball
         draw_ball(WindowSurface, ball);
-        // set_pixel(WindowSurface, 640, 480, WHITE);
-        //TODO: Implement ball movement
 
 
         SDL_UpdateWindowSurface(Window);
